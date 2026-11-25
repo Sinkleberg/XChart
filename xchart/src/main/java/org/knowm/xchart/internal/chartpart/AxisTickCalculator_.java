@@ -90,7 +90,8 @@ public abstract class AxisTickCalculator_ implements AxisTickCalculator {
   }
 
   /**
-   * Gets the first position
+   * Gets the leading candidate position for date axes. Numeric axes select visible grid multiples
+   * directly in calculate().
    *
    * @param gridStep
    * @return
@@ -260,6 +261,11 @@ public abstract class AxisTickCalculator_ implements AxisTickCalculator {
 
     BigDecimal lower = BigDecimal.valueOf(minValue);
     BigDecimal upper = BigDecimal.valueOf(maxValue);
+    // Match the boundary tolerance of the former pixel-space pruning, without passing values
+    // outside the actual range to a formatter.
+    BigDecimal tolerance = upper.subtract(lower).multiply(BigDecimal.valueOf(1e-6 / tickSpace));
+    BigDecimal gridLower = lower.subtract(tolerance);
+    BigDecimal gridUpper = upper.add(tolerance);
     List<String> layoutLabels;
     int gridStepInChartSpace;
 
@@ -327,37 +333,69 @@ public abstract class AxisTickCalculator_ implements AxisTickCalculator {
           cleanedGridStep0
               .setScale(scale, RoundingMode.HALF_DOWN)
               .stripTrailingZeros(); // chop off any double imprecision
+      if (cleanedGridStep.signum() == 0) {
+        // Rounding to ten decimal places must not erase a small but valid grid step.
+        cleanedGridStep = gridStepBigDecimal.stripTrailingZeros();
+      }
       // System.out.println("cleanedGridStep: " + cleanedGridStep);
 
-      // Decimal arithmetic keeps exact grid multiples at either boundary.
+      // Include grid multiples within the pixel tolerance of either boundary.
       BigDecimal first =
-          cleanedGridStep.signum() == 0
-              ? null
-              : lower.divide(cleanedGridStep, 0, RoundingMode.CEILING).multiply(cleanedGridStep);
-      if (first == null || first.compareTo(upper) > 0) {
-        double middle = lower.add(upper).divide(BigDecimal.valueOf(2)).doubleValue();
-        tickLabels.add(getAxisFormat().format(middle));
-        tickLocations.add(workingSpace / 2.0);
-        return;
+          gridLower.divide(cleanedGridStep, 0, RoundingMode.CEILING).multiply(cleanedGridStep);
+      while (first.compareTo(gridUpper) > 0) {
+        cleanedGridStep = finerGridStep(cleanedGridStep);
+        first =
+            gridLower.divide(cleanedGridStep, 0, RoundingMode.CEILING).multiply(cleanedGridStep);
+        gridStepInChartSpace = (int) (cleanedGridStep.doubleValue() / span * tickSpace);
       }
-      BigDecimal value = first;
-      while (value.compareTo(upper) <= 0) {
-        double tick = value.doubleValue();
-        tickLabels.add(getAxisFormat().format(tick));
-        tickLocations.add(margin + (tick - minValue) / (maxValue - minValue) * tickSpace);
-        value = value.add(cleanedGridStep);
+      boolean includeNeighbours = includeNeighbourLabelsInLayout();
+      BigDecimal start =
+          includeNeighbours
+              ? lower
+                  .divideToIntegralValue(cleanedGridStep)
+                  .subtract(BigDecimal.ONE)
+                  .multiply(cleanedGridStep)
+              : first;
+      BigDecimal limit =
+          includeNeighbours
+              ? upper.add(cleanedGridStep.multiply(BigDecimal.valueOf(2)))
+              : gridUpper;
+      layoutLabels = new ArrayList<>();
+      for (BigDecimal value = start;
+          includeNeighbours ? value.compareTo(limit) < 0 : value.compareTo(limit) <= 0;
+          value = value.add(cleanedGridStep)) {
+        if (value.compareTo(gridLower) >= 0 && value.compareTo(gridUpper) <= 0) {
+          double tick = Math.max(minValue, Math.min(maxValue, value.doubleValue()));
+          String label = getAxisFormat().format(tick);
+          tickLabels.add(label);
+          tickLocations.add(margin + (tick - minValue) / (maxValue - minValue) * tickSpace);
+          layoutLabels.add(label);
+        } else if (includeNeighbours && Double.isFinite(value.doubleValue())) {
+          // Only built-in number formatting uses neighbours to retain its existing spacing.
+          layoutLabels.add(getAxisFormat().format(value.doubleValue()));
+        }
       }
       if (tickLabels.size() == 1) {
         return;
       }
-      layoutLabels = labelsForGridSpacing(lower, upper, first, value, cleanedGridStep);
     } while (!areAllTickLabelsUnique(layoutLabels)
         || !willLabelsFitInTickSpaceHint(layoutLabels, gridStepInChartSpace));
   }
 
-  List<String> labelsForGridSpacing(
-      BigDecimal lower, BigDecimal upper, BigDecimal first, BigDecimal next, BigDecimal step) {
-    return tickLabels;
+  boolean includeNeighbourLabelsInLayout() {
+    return false;
+  }
+
+  private static BigDecimal finerGridStep(BigDecimal step) {
+    BigDecimal decade = BigDecimal.ONE.scaleByPowerOfTen(step.precision() - step.scale() - 1);
+    BigDecimal significand = step.divide(decade);
+    if (significand.compareTo(BigDecimal.valueOf(2)) > 0) {
+      return decade.multiply(BigDecimal.valueOf(2));
+    }
+    if (significand.compareTo(BigDecimal.ONE) > 0) {
+      return decade;
+    }
+    return decade.multiply(BigDecimal.valueOf(0.5));
   }
 
   private boolean areValuesEquallySpaced(List<Double> values) {

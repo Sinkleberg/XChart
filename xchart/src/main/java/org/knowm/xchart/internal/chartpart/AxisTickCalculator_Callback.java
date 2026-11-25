@@ -11,6 +11,9 @@ import org.knowm.xchart.style.AxesChartStyler;
  */
 class AxisTickCalculator_Callback extends AxisTickCalculator_ {
 
+  // Layout measures visible labels only. Calling a user formatter on hypothetical neighbours
+  // could throw or cause side effects, even when those labels would never be displayed.
+
   /**
    * Constructor
    *

@@ -14,11 +14,11 @@ public class RegressionIssue634Test {
 
   /**
    * With all-positive data and a small plot content size, the Y-axis tick generator used to emit a
-   * tick one grid step below the axis minimum (getFirstPosition -> minValue - (minValue % gridStep) -
-   * gridStep), which is negative whenever the minimum is smaller than one grid step. That negative
-   * tick leaked past the tick-label renderer (which clips to the taller axis-column bounds) and drew
-   * a negative label in the bottom plot margin. After the fix, ticks outside [minValue, maxValue] are
-   * pruned, so no tick label represents a value outside the data band.
+   * tick one grid step below the axis minimum (getFirstPosition -> minValue - (minValue % gridStep)
+   * - gridStep), which is negative whenever the minimum is smaller than one grid step. That
+   * negative tick leaked past the tick-label renderer (which clips to the taller axis-column
+   * bounds) and drew a negative label in the bottom plot margin. Numeric tick generation now
+   * selects only visible grid multiples, so no tick label represents a value outside the data band.
    */
   @Test
   public void noTickLabelOutsideDataBandForAllPositiveData() {
