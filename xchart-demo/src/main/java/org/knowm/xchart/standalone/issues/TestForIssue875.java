@@ -6,7 +6,7 @@ import org.knowm.xchart.CategoryChart;
 import org.knowm.xchart.CategoryChartBuilder;
 import org.knowm.xchart.SwingWrapper;
 
-/** Category lists and primitive numeric values, without boxing at the call site. */
+/** Category lists and primitive numeric arrays, matching Scala collection types. */
 public class TestForIssue875 {
 
   public static void main(String[] args) {
@@ -24,9 +24,10 @@ public class TestForIssue875 {
             .yAxisTitle("Value")
             .build();
     List<String> categories = Arrays.asList("First", "Second", "Third");
-    chart.addSeriesWithCategories("Integers", categories, new int[] {3, 1, 4});
-    chart.addSeriesWithCategories(
+    chart.addSeriesWithIntValues("Integers", categories, new int[] {3, 1, 4});
+    chart.addSeriesWithDoubleValues(
         "Doubles", categories, new double[] {2.5, 3.5, 4.5}, new double[] {0.5, 0.25, 0.75});
+    chart.updateCategorySeriesWithIntValues("Integers", categories, new int[] {4, 2, 5});
     return chart;
   }
 }

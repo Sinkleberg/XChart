@@ -225,17 +225,6 @@ Series render styles include: `Line`, `Scatter`, `Area`, `Step` and `StepArea`.
 
 `CategoryChart` charts take Date, Number or String data types for the X-Axis and Number data types for the Y-Axis. For the X-Axis, each category is given its own tick mark.
 
-For category lists with primitive numeric values, use `addSeriesWithCategories`:
-
-```java
-chart.addSeriesWithCategories("Values", Arrays.asList("First", "Second"), new int[] {3, 5});
-```
-
-Both `int[]` and `double[]` values are supported, with an optional fourth argument for error bars
-of the same primitive type. This delegates to the existing List-based API, including its validation
-and generated categories when the category list is `null`. The distinct method name keeps existing
-calls such as `addSeries("Values", null, new double[] {3, 5})` source compatible.
-
 Series render styles include: `Bar`, `Line`, `Scatter`, `Area` and `Stick`.
 
 ### PieChart
@@ -754,6 +743,16 @@ To use XChart with the Scala Build Tool (SBT) add the following to your build.sb
 
 ```scala
 libraryDependencies += "org.knowm.xchart" % "xchart" % "3.9.0" exclude("de.erichseifert.vectorgraphics2d", "VectorGraphics2D") withSources()
+```
+
+In the unreleased development version, Scala callers can use category lists with primitive arrays
+for both adding and updating series. These methods are not available in the 3.9.0 dependency shown above:
+
+```scala
+import scala.jdk.CollectionConverters._
+val categories = List("A", "B").asJava
+chart.addSeriesWithIntValues("values", categories, Array(3, 1))
+chart.updateCategorySeriesWithDoubleValues("values", categories, Array(4.5, 2.0))
 ```
 
 ## Building with Maven

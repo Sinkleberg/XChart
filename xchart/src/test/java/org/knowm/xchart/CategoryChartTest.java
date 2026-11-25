@@ -14,7 +14,6 @@ import org.junit.jupiter.api.Test;
 import org.knowm.xchart.CategorySeries.CategorySeriesRenderStyle;
 import org.knowm.xchart.custom.CustomGraphic;
 import org.knowm.xchart.custom.CustomTheme;
-import org.knowm.xchart.internal.Utils;
 import org.knowm.xchart.internal.series.Series;
 import org.knowm.xchart.style.Styler;
 import org.knowm.xchart.style.Styler.ChartTheme;
@@ -161,14 +160,14 @@ public class CategoryChartTest {
     for (int i = 0; i < categories.size(); i++) {
       List<?> xData = categories.get(i);
       CategorySeries doubles =
-          chart.addSeriesWithCategories(
+          chart.addSeriesWithDoubleValues(
               "double" + i, xData, new double[] {-2.5, 4}, new double[] {0.5, 1.5});
       CategorySeries expectedDoubles =
           chart.addSeries(
               "listDouble" + i, xData, Arrays.asList(-2.5, 4.0), Arrays.asList(0.5, 1.5));
       assertCategoryDataEquals(expectedDoubles, doubles);
       CategorySeries integers =
-          chart.addSeriesWithCategories("int" + i, xData, new int[] {-2, 4}, new int[] {1, 2});
+          chart.addSeriesWithIntValues("int" + i, xData, new int[] {-2, 4}, new int[] {1, 2});
       CategorySeries expectedIntegers =
           chart.addSeries("listInt" + i, xData, Arrays.asList(-2, 4), Arrays.asList(1, 2));
       assertCategoryDataEquals(expectedIntegers, integers);
@@ -179,8 +178,8 @@ public class CategoryChartTest {
 
   @Test
   void primitiveYWithCategoriesSupportsMissingCategoriesAndErrorBars() {
-    CategorySeries doubles = chart.addSeriesWithCategories("double", null, new double[] {2.5, 4});
-    CategorySeries integers = chart.addSeriesWithCategories("int", null, new int[] {2, 4});
+    CategorySeries doubles = chart.addSeriesWithDoubleValues("double", null, new double[] {2.5, 4});
+    CategorySeries integers = chart.addSeriesWithIntValues("int", null, new int[] {2, 4});
     assertCategoryDataEquals(chart.addSeries("listDouble", null, Arrays.asList(2.5, 4.0)), doubles);
     assertCategoryDataEquals(chart.addSeries("listInt", null, Arrays.asList(2, 4)), integers);
     assertEquals(Arrays.asList(1.0, 2.0), doubles.getXData());
@@ -188,31 +187,57 @@ public class CategoryChartTest {
     assertThat(integers.getExtraValues()).isNull();
     assertCategoryDataEquals(
         chart.addSeries("noErrors", Arrays.asList("A", "B"), Arrays.asList(2, 4)),
-        chart.addSeriesWithCategories("namedNoErrors", Arrays.asList("A", "B"), new int[] {2, 4}));
+        chart.addSeriesWithIntValues("namedNoErrors", Arrays.asList("A", "B"), new int[] {2, 4}));
   }
 
   @Test
   void primitiveYWithCategoriesPreservesListValidationAndFailedInsertion() {
-    assertPrimitiveCategoryFailure(Arrays.asList("A"), null, null);
-    assertPrimitiveCategoryFailure(Arrays.asList("A"), new int[] {}, null);
-    assertPrimitiveCategoryFailure(Collections.emptyList(), new int[] {1}, null);
-    assertPrimitiveCategoryFailure(Arrays.asList("A", "B"), new int[] {1}, null);
-    assertPrimitiveCategoryFailure(Arrays.asList("A"), new int[] {1}, new int[] {1, 2});
-    assertPrimitiveCategoryFailure(Arrays.asList(new Object()), new int[] {1}, null);
+    assertPrimitiveCategoryFailure(
+        Arrays.asList("A"), null, null, null, null, "Y-Axis data cannot be null!!!");
+    assertPrimitiveCategoryFailure(
+        Arrays.asList("A"),
+        new int[] {},
+        new double[] {},
+        null,
+        null,
+        "Y-Axis data cannot be empty!!!");
+    assertPrimitiveCategoryFailure(
+        Collections.emptyList(),
+        new int[] {1},
+        new double[] {1},
+        null,
+        null,
+        "X-Axis data cannot be empty!!!");
+    assertPrimitiveCategoryFailure(
+        Arrays.asList("A", "B"),
+        new int[] {1},
+        new double[] {1},
+        null,
+        null,
+        "X and Y-Axis sizes are not the same!!!");
+    assertPrimitiveCategoryFailure(
+        Arrays.asList("A"),
+        new int[] {1},
+        new double[] {1},
+        new int[] {1, 2},
+        new double[] {1, 2},
+        "Error bars and Y-Axis sizes are not the same!!!");
+    assertPrimitiveCategoryFailure(
+        Arrays.asList(new Object()),
+        new int[] {1},
+        new double[] {1},
+        null,
+        null,
+        "Series data must be either Number, Date or String type!!!");
     chart.addSeries("duplicate", null, Arrays.asList(1));
-    for (boolean integerY : new boolean[] {false, true}) {
-      assertThatThrownBy(
-              () -> {
-                if (integerY) {
-                  chart.addSeriesWithCategories("duplicate", null, (int[]) null);
-                } else {
-                  chart.addSeriesWithCategories("duplicate", null, (double[]) null);
-                }
-              })
-          .isInstanceOf(IllegalArgumentException.class)
-          .hasMessage(
-              "Series name >duplicate< has already been used. Use unique names for each series!!!");
-    }
+    assertThatThrownBy(() -> chart.addSeriesWithIntValues("duplicate", null, null))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage(
+            "Series name >duplicate< has already been used. Use unique names for each series!!!");
+    assertThatThrownBy(() -> chart.addSeriesWithDoubleValues("duplicate", null, null))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage(
+            "Series name >duplicate< has already been used. Use unique names for each series!!!");
     assertThat(chart.getSeriesCollection())
         .extracting(CategorySeries::getName)
         .containsExactly("duplicate");
@@ -226,29 +251,123 @@ public class CategoryChartTest {
     chart.addSeries("intErrors", null, new int[] {1}, null);
     chart.addSeries("list", null, Arrays.asList(1));
     chart.addSeries("listErrors", null, Arrays.asList(1), null);
+    chart.updateCategorySeries("double", null, new double[] {2}, null);
+    chart.updateCategorySeries("list", null, Arrays.asList(2), null);
     assertThat(chart.getSeriesCollection()).hasSize(6);
   }
 
-  private void assertPrimitiveCategoryFailure(List<?> xData, int[] yData, int[] errorBars) {
-    List<Double> yList = Utils.getNumberListFromIntArray(yData);
-    List<Double> errors = Utils.getNumberListFromIntArray(errorBars);
-    IllegalArgumentException expected =
-        assertThrows(
-            IllegalArgumentException.class, () -> chart.addSeries("invalid", xData, yList, errors));
-    IllegalArgumentException integers =
-        assertThrows(
-            IllegalArgumentException.class,
-            () -> chart.addSeriesWithCategories("invalid", xData, yData, errorBars));
-    double[] doubleY =
-        yList == null ? null : yList.stream().mapToDouble(Double::doubleValue).toArray();
-    double[] doubleErrors =
-        errors == null ? null : errors.stream().mapToDouble(Double::doubleValue).toArray();
-    IllegalArgumentException doubles =
-        assertThrows(
-            IllegalArgumentException.class,
-            () -> chart.addSeriesWithCategories("invalid", xData, doubleY, doubleErrors));
-    assertEquals(expected.getMessage(), integers.getMessage());
-    assertEquals(expected.getMessage(), doubles.getMessage());
+  @Test
+  void primitiveDoubleValuesUseDirectArrayPath() {
+    double[] values = {-2.5, 4};
+    double[] errors = {0.5, 1.5};
+    CategorySeries series =
+        chart.addSeriesWithDoubleValues("values", Arrays.asList("B", "A"), values, errors);
+    assertSame(values, series.getYData());
+    assertSame(errors, series.getExtraValues());
+    double[] updatedValues = {6, -1};
+    double[] updatedErrors = {2, 0.25};
+    assertSame(
+        series,
+        chart.updateCategorySeriesWithDoubleValues(
+            "values", Arrays.asList("C", "D"), updatedValues, updatedErrors));
+    assertSame(updatedValues, series.getYData());
+    assertSame(updatedErrors, series.getExtraValues());
+    assertThat(series.getXData()).isEqualTo(Arrays.asList("C", "D"));
+    assertEquals(-1.25, series.getYMin());
+    assertEquals(8, series.getYMax());
+  }
+
+  @Test
+  void primitiveCategoryUpdatesSupportBothValueTypesAndMissingErrors() {
+    CategorySeries series =
+        chart.addSeriesWithIntValues("values", Arrays.asList("A", "B"), new int[] {1, 2});
+    series.setChartCategorySeriesRenderStyle(CategorySeriesRenderStyle.Line);
+    assertSame(
+        series,
+        chart.updateCategorySeriesWithIntValues(
+            "values", Arrays.asList("B", "A"), new int[] {-3, 5}, new int[] {1, 2}));
+    assertThat(series.getXData()).isEqualTo(Arrays.asList("B", "A"));
+    assertThat(series.getYData()).containsExactly(-3, 5);
+    assertThat(series.getExtraValues()).containsExactly(1, 2);
+    assertEquals(-4, series.getYMin());
+    assertEquals(7, series.getYMax());
+    assertEquals(Series.DataType.String, series.getxAxisDataType());
+    assertThat(series.getChartCategorySeriesRenderStyle()).contains(CategorySeriesRenderStyle.Line);
+    chart.updateCategorySeriesWithIntValues("values", Arrays.asList("C"), new int[] {9});
+    assertThat(series.getYData()).containsExactly(9);
+    assertThat(series.getExtraValues()).isNull();
+    chart.updateCategorySeriesWithDoubleValues("values", Arrays.asList("D"), new double[] {1.5});
+    assertThat(series.getYData()).containsExactly(1.5);
+    assertThat(series.getExtraValues()).isNull();
+  }
+
+  @Test
+  void primitiveCategoryUpdatesMatchListUpdatesForDatesNumbersAndGeneratedCategories() {
+    List<List<?>> categories =
+        Arrays.asList(Arrays.asList(new Date(86400000), new Date(0)), Arrays.asList(20, 10), null);
+    for (int i = 0; i < categories.size(); i++) {
+      List<?> xData = categories.get(i);
+      chart.addSeriesWithIntValues("primitive" + i, xData, new int[] {1, 2});
+      chart.addSeries("list" + i, xData, Arrays.asList(1, 2));
+      CategorySeries actual =
+          chart.updateCategorySeriesWithDoubleValues(
+              "primitive" + i, xData, new double[] {-2.5, 4}, new double[] {0.5, 1.5});
+      CategorySeries expected =
+          chart.updateCategorySeries(
+              "list" + i,
+              xData != null ? xData : Arrays.asList(1.0, 2.0),
+              Arrays.asList(-2.5, 4.0),
+              Arrays.asList(0.5, 1.5));
+      assertCategoryDataEquals(expected, actual);
+    }
+    CategorySeries generated =
+        chart.updateCategorySeriesWithIntValues("primitive2", null, new int[] {5, 6, 7});
+    assertThat(generated.getXData()).isEqualTo(Arrays.asList(1.0, 2.0, 3.0));
+    assertEquals(Series.DataType.Number, generated.getxAxisDataType());
+  }
+
+  @Test
+  void invalidPrimitiveCategoryUpdatesPreserveSeriesData() {
+    CategorySeries series =
+        chart.addSeriesWithIntValues("values", Arrays.asList("A"), new int[] {1});
+    assertThatThrownBy(
+            () -> chart.updateCategorySeriesWithDoubleValues("missing", null, null, null))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Series name >missing< not found!!!");
+    assertThatThrownBy(() -> chart.updateCategorySeriesWithIntValues("missing", null, null, null))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Series name >missing< not found!!!");
+    assertThatThrownBy(
+            () ->
+                chart.updateCategorySeriesWithDoubleValues(
+                    "values", Arrays.asList("A", "B"), new double[] {2}, null))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("X and Y-Axis sizes are not the same!!!");
+    assertThatThrownBy(
+            () ->
+                chart.updateCategorySeriesWithIntValues(
+                    "values", Arrays.asList("A"), new int[] {2}, new int[] {1, 2}))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("error bars and Y-Axis sizes are not the same!!!");
+    assertThat(series.getXData()).isEqualTo(Arrays.asList("A"));
+    assertThat(series.getYData()).containsExactly(1);
+    assertThat(series.getExtraValues()).isNull();
+  }
+
+  private void assertPrimitiveCategoryFailure(
+      List<?> xData,
+      int[] intY,
+      double[] doubleY,
+      int[] intErrors,
+      double[] doubleErrors,
+      String message) {
+    assertThatThrownBy(() -> chart.addSeriesWithIntValues("invalid", xData, intY, intErrors))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage(message);
+    assertThatThrownBy(
+            () -> chart.addSeriesWithDoubleValues("invalid", xData, doubleY, doubleErrors))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage(message);
     assertThat(chart.getSeriesCollection()).isEmpty();
   }
 
@@ -389,8 +508,10 @@ public class CategoryChartTest {
     List<Double> xData = Arrays.asList(0.0, 1.0, 2.0, 3.0, 4.0);
 
     // Chart A — all 5 values present; should render 5 labels.
-    CategoryChart chart5On = buildIssue707Chart(xData, Arrays.asList(2.0, 1.5, 4.0, 3.77, 2.5), true);
-    CategoryChart chart5Off = buildIssue707Chart(xData, Arrays.asList(2.0, 1.5, 4.0, 3.77, 2.5), false);
+    CategoryChart chart5On =
+        buildIssue707Chart(xData, Arrays.asList(2.0, 1.5, 4.0, 3.77, 2.5), true);
+    CategoryChart chart5Off =
+        buildIssue707Chart(xData, Arrays.asList(2.0, 1.5, 4.0, 3.77, 2.5), false);
 
     // Chart B — last value is NaN so bar 5 is skipped; only 4 labels are rendered.
     CategoryChart chartNaNOn =

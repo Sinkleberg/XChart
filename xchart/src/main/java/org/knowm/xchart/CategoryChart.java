@@ -102,21 +102,11 @@ public class CategoryChart extends AxesChart<CategoryStyler, CategorySeries> {
   public CategorySeries addSeries(
       String seriesName, double[] xData, double[] yData, double[] errorBars) {
 
-    List<?> xList = xData != null ? Utils.getNumberListFromDoubleArray(xData) : null;
-    if (xList != null) {
-      sanityCheck(seriesName, xList, yData, errorBars);
-      if (xList.size() != yData.length) {
-        throw new IllegalArgumentException("X and Y-Axis sizes are not the same!!!");
-      }
-    } else {
-      sanityCheck(seriesName, null, yData, errorBars);
-      xList = Utils.getGeneratedDataAsList(yData.length);
-    }
-    CategorySeries series =
-        new CategorySeries(seriesName, xList, yData, errorBars, DataType.Number);
-    seriesMap.put(seriesName, series);
-
-    return series;
+    return addPrimitiveSeries(
+        seriesName,
+        xData != null ? Utils.getNumberListFromDoubleArray(xData) : null,
+        yData,
+        errorBars);
   }
 
   /**
@@ -143,28 +133,11 @@ public class CategoryChart extends AxesChart<CategoryStyler, CategorySeries> {
    */
   public CategorySeries addSeries(String seriesName, int[] xData, int[] yData, int[] errorBars) {
 
-    double[] yDoubles = new double[yData.length];
-    for (int i = 0; i < yData.length; i++) yDoubles[i] = yData[i];
-    double[] ebDoubles = null;
-    if (errorBars != null) {
-      ebDoubles = new double[errorBars.length];
-      for (int i = 0; i < errorBars.length; i++) ebDoubles[i] = errorBars[i];
-    }
-    List<?> xList = xData != null ? Utils.getNumberListFromIntArray(xData) : null;
-    if (xList != null) {
-      sanityCheck(seriesName, xList, yDoubles, ebDoubles);
-      if (xList.size() != yDoubles.length) {
-        throw new IllegalArgumentException("X and Y-Axis sizes are not the same!!!");
-      }
-    } else {
-      sanityCheck(seriesName, null, yDoubles, ebDoubles);
-      xList = Utils.getGeneratedDataAsList(yDoubles.length);
-    }
-    CategorySeries series =
-        new CategorySeries(seriesName, xList, yDoubles, ebDoubles, DataType.Number);
-    seriesMap.put(seriesName, series);
-
-    return series;
+    return addPrimitiveSeries(
+        seriesName,
+        xData != null ? Utils.getNumberListFromIntArray(xData) : null,
+        Utils.getDoubleArrayFromIntArray(yData),
+        Utils.getDoubleArrayFromIntArray(errorBars));
   }
 
   /**
@@ -219,17 +192,15 @@ public class CategoryChart extends AxesChart<CategoryStyler, CategorySeries> {
   /**
    * Add a series with Number, Date or String categories and primitive double Y values.
    *
-   * <p>The separate method name preserves existing {@code addSeries(name, null, yData)} calls.
-   * Values are converted to the List-based API and use its validation rules.
-   *
    * @param seriesName the series name
    * @param xData the categories, or null to generate values from 1 through the Y data size
    * @param yData the Y-Axis data
    * @return a series object that you can set properties on
    */
-  public CategorySeries addSeriesWithCategories(String seriesName, List<?> xData, double[] yData) {
+  public CategorySeries addSeriesWithDoubleValues(
+      String seriesName, List<?> xData, double[] yData) {
 
-    return addSeriesWithCategories(seriesName, xData, yData, null);
+    return addSeriesWithDoubleValues(seriesName, xData, yData, null);
   }
 
   /**
@@ -240,32 +211,25 @@ public class CategoryChart extends AxesChart<CategoryStyler, CategorySeries> {
    * @param yData the Y-Axis data
    * @param errorBars the error bar data, or null for no error bars
    * @return a series object that you can set properties on
-   * @see #addSeriesWithCategories(String, List, double[])
+   * @see #addSeriesWithDoubleValues(String, List, double[])
    */
-  public CategorySeries addSeriesWithCategories(
+  public CategorySeries addSeriesWithDoubleValues(
       String seriesName, List<?> xData, double[] yData, double[] errorBars) {
 
-    return addSeries(
-        seriesName,
-        xData,
-        Utils.getNumberListFromDoubleArray(yData),
-        Utils.getNumberListFromDoubleArray(errorBars));
+    return addPrimitiveSeries(seriesName, xData, yData, errorBars);
   }
 
   /**
    * Add a series with Number, Date or String categories and primitive integer Y values.
-   *
-   * <p>The separate method name preserves existing {@code addSeries(name, null, yData)} calls.
-   * Values are converted to the List-based API and use its validation rules.
    *
    * @param seriesName the series name
    * @param xData the categories, or null to generate values from 1 through the Y data size
    * @param yData the Y-Axis data
    * @return a series object that you can set properties on
    */
-  public CategorySeries addSeriesWithCategories(String seriesName, List<?> xData, int[] yData) {
+  public CategorySeries addSeriesWithIntValues(String seriesName, List<?> xData, int[] yData) {
 
-    return addSeriesWithCategories(seriesName, xData, yData, null);
+    return addSeriesWithIntValues(seriesName, xData, yData, null);
   }
 
   /**
@@ -276,16 +240,16 @@ public class CategoryChart extends AxesChart<CategoryStyler, CategorySeries> {
    * @param yData the Y-Axis data
    * @param errorBars the error bar data, or null for no error bars
    * @return a series object that you can set properties on
-   * @see #addSeriesWithCategories(String, List, int[])
+   * @see #addSeriesWithIntValues(String, List, int[])
    */
-  public CategorySeries addSeriesWithCategories(
+  public CategorySeries addSeriesWithIntValues(
       String seriesName, List<?> xData, int[] yData, int[] errorBars) {
 
-    return addSeries(
+    return addPrimitiveSeries(
         seriesName,
         xData,
-        Utils.getNumberListFromIntArray(yData),
-        Utils.getNumberListFromIntArray(errorBars));
+        Utils.getDoubleArrayFromIntArray(yData),
+        Utils.getDoubleArrayFromIntArray(errorBars));
   }
 
   private DataType getDataType(List<?> data) {
@@ -355,24 +319,109 @@ public class CategoryChart extends AxesChart<CategoryStyler, CategorySeries> {
   public CategorySeries updateCategorySeries(
       String seriesName, double[] newXData, double[] newYData, double[] newErrorBarData) {
 
-    Map<String, CategorySeries> seriesMap = this.seriesMap;
-    CategorySeries series = seriesMap.get(seriesName);
-    if (series == null) {
-      throw new IllegalArgumentException("Series name >" + seriesName + "< not found!!!");
-    }
-    if (newXData == null) {
-      series.replaceData(Utils.getGeneratedDataAsList(newYData.length), newYData, newErrorBarData);
-    } else {
-      series.replaceData(
-          Utils.getNumberListFromDoubleArray(newXData), newYData, newErrorBarData);
-    }
+    return updatePrimitiveSeries(
+        seriesName,
+        newXData != null ? Utils.getNumberListFromDoubleArray(newXData) : null,
+        newYData,
+        newErrorBarData);
+  }
 
-    return series;
+  /**
+   * Update a series with categories and primitive double Y values.
+   *
+   * @param seriesName the series name
+   * @param newXData the categories, or null to generate increasing values from 1
+   * @param newYData the Y-Axis data
+   * @return the updated series
+   */
+  public CategorySeries updateCategorySeriesWithDoubleValues(
+      String seriesName, List<?> newXData, double[] newYData) {
+
+    return updateCategorySeriesWithDoubleValues(seriesName, newXData, newYData, null);
+  }
+
+  /**
+   * Update a series with categories and primitive double Y values, with optional error bars.
+   *
+   * @param seriesName the series name
+   * @param newXData the categories, or null to generate increasing values from 1
+   * @param newYData the Y-Axis data
+   * @param newErrorBarData the error bar data, or null for no error bars
+   * @return the updated series
+   */
+  public CategorySeries updateCategorySeriesWithDoubleValues(
+      String seriesName, List<?> newXData, double[] newYData, double[] newErrorBarData) {
+
+    return updatePrimitiveSeries(seriesName, newXData, newYData, newErrorBarData);
+  }
+
+  /**
+   * Update a series with categories and primitive integer Y values.
+   *
+   * @param seriesName the series name
+   * @param newXData the categories, or null to generate increasing values from 1
+   * @param newYData the Y-Axis data
+   * @return the updated series
+   */
+  public CategorySeries updateCategorySeriesWithIntValues(
+      String seriesName, List<?> newXData, int[] newYData) {
+
+    return updateCategorySeriesWithIntValues(seriesName, newXData, newYData, null);
+  }
+
+  /**
+   * Update a series with categories and primitive integer Y values, with optional error bars.
+   *
+   * @param seriesName the series name
+   * @param newXData the categories, or null to generate increasing values from 1
+   * @param newYData the Y-Axis data
+   * @param newErrorBarData the error bar data, or null for no error bars
+   * @return the updated series
+   */
+  public CategorySeries updateCategorySeriesWithIntValues(
+      String seriesName, List<?> newXData, int[] newYData, int[] newErrorBarData) {
+
+    return updatePrimitiveSeries(
+        seriesName,
+        newXData,
+        Utils.getDoubleArrayFromIntArray(newYData),
+        Utils.getDoubleArrayFromIntArray(newErrorBarData));
   }
 
   ///////////////////////////////////////////////////
   // Internal Members and Methods ///////////////////
   ///////////////////////////////////////////////////
+
+  private CategorySeries addPrimitiveSeries(
+      String seriesName, List<?> xData, double[] yData, double[] errorBars) {
+
+    sanityCheck(seriesName, xData, yData, errorBars);
+    if (xData == null) {
+      xData = Utils.getGeneratedDataAsList(yData.length);
+    } else if (xData.size() != yData.length) {
+      throw new IllegalArgumentException("X and Y-Axis sizes are not the same!!!");
+    }
+    CategorySeries series =
+        new CategorySeries(seriesName, xData, yData, errorBars, getDataType(xData));
+    seriesMap.put(seriesName, series);
+
+    return series;
+  }
+
+  private CategorySeries updatePrimitiveSeries(
+      String seriesName, List<?> newXData, double[] newYData, double[] newErrorBarData) {
+
+    CategorySeries series = seriesMap.get(seriesName);
+    if (series == null) {
+      throw new IllegalArgumentException("Series name >" + seriesName + "< not found!!!");
+    }
+    series.replaceData(
+        newXData != null ? newXData : Utils.getGeneratedDataAsList(newYData.length),
+        newYData,
+        newErrorBarData);
+
+    return series;
+  }
 
   private void sanityCheck(
       String seriesName,
